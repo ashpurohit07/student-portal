@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart Learning Hub – Admin Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <script>
+    (function () {
+      const stored = localStorage.getItem('slhTheme');
+      const sys = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored === 'light') document.documentElement.classList.remove('dark');
+      else if (stored === 'dark' || sys) document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
+    })();
+  </script>
+
+  <!-- Firebase (adjust versions if needed) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --indigo: #6366f1;
+      --indigo-light: #818cf8;
+      --indigo-dark: #4f46e5;
+    }
+
+    body {
+      font-family: 'Sora', sans-serif;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    code,
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #6366f133;
+      border-radius: 99px;
+    }
+
+    /* Animated BG */
+    html.dark body {
+      background: #080c18;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99, 102, 241, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(99, 102, 241, 0.10) 0%, transparent 60%);
+    }
+
+    html:not(.dark) body {
+      background: #f8f9ff;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99, 102, 241, 0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(99, 102, 241, 0.06) 0%, transparent 60%);
+    }
+
+    /* Toggle */
+    .toggle-track {
+      width: 52px;
+      height: 28px;
+      border-radius: 999px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+      transition: transform 0.3s cubic-bezier(.34, 1.56, .64, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    html.dark .toggle-track {
+      background: #6366f1;
+    }
+
+    html:not(.dark) .toggle-track {
+      background: #f59e0b;
+    }
+
+    html.dark .toggle-thumb {
+      transform: translateX(0);
+    }
+
+    html:not(.dark) .toggle-thumb {
+      transform: translateX(24px);
+    }
+
+    /* Card Transitions & Hover*/
+    .card-transition {
+      transition: background 0.35s, border-color 0.35s, box-shadow 0.35s;
+    }
+
+    .interactive-card {
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    }
+
+    .interactive-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px rgba(99, 102, 241, 0.12);
+      border-color: rgba(99, 102, 241, 0.4) !important;
+    }
+
+    /* Fade-up */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-up {
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .d1 {
+      animation-delay: 0.05s;
+    }
+
+    .d2 {
+      animation-delay: 0.15s;
+    }
+
+    .d3 {
+      animation-delay: 0.25s;
+    }
+
+    .d4 {
+      animation-delay: 0.35s;
+    }
+
+    .glow-pill:hover {
+      box-shadow: 0 0 24px rgba(99, 102, 241, 0.35);
+    }
+
+    .input-el {
+      transition: background 0.35s ease, border-color 0.2s ease, color 0.35s ease;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen dark:text-slate-100 text-slate-800 flex flex-col">
+
+  <!-- Header -->
+  <header
+    class="w-full sticky top-0 z-50 dark:bg-[#080c18]/85 bg-white/85 backdrop-blur-md border-b dark:border-slate-800/50 border-slate-200/70 card-transition">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between gap-4">
+
+      <!-- Logo -->
+      <a href="home.html" class="flex items-center gap-3 shrink-0 fade-up d1">
+        <div class="h-10 w-10 rounded-xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <span class="text-base font-bold text-white tracking-tight">SL</span>
+        </div>
+        <div class="flex flex-col leading-tight">
+          <span class="text-[15px] font-semibold dark:text-slate-100 text-slate-800">Smart Learning Hub</span>
+          <span class="text-[10px] dark:text-slate-500 text-slate-400 mono tracking-wide text-indigo-500">Admin
+            Console</span>
+        </div>
+      </a>
+
+      <!-- Right Controls -->
+      <div class="flex items-center gap-3 fade-up d2">
+        <span id="adminName"
+          class="hidden md:inline text-xs font-semibold px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-400">
+          Admin
+        </span>
+        <!-- Theme toggle -->
+        <div class="toggle-track" id="themeToggle" role="switch" aria-checked="true" aria-label="Toggle theme"
+          tabindex="0">
+          <div class="toggle-thumb"><span id="toggleIcon">🌙</span></div>
+        </div>
+
+        <!-- Logout Button -->
+        <button type="button" onclick="handleLogout()"
+          class="text-xs px-4 py-2 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white dark:hover:bg-red-500/20 dark:hover:text-red-400 transition-colors ml-1 sm:ml-2 font-medium">
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard -->
+  <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8 sm:py-12 space-y-12">
+
+    <!-- Top Intro -->
+    <section class="fade-up d1 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold mono uppercase tracking-[0.2em] text-indigo-500 mb-1">
+          Admin Dashboard
+        </p>
+        <h1
+          class="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
+          Manage Resources
+        </h1>
+        <p class="mt-3 text-sm sm:text-[15px] text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
+          Oversee student uploads, approve highly requested materials, and confidently manage the official repository
+          for all semesters.
+        </p>
+      </div>
+      <div class="flex gap-4">
+        <div
+          class="px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10 flex flex-col items-center justify-center min-w-[100px] shadow-sm">
+          <span class="text-2xl font-bold text-amber-600 dark:text-amber-400" id="pendingStat">0</span>
+          <span
+            class="text-[10px] uppercase tracking-wider font-semibold text-amber-600/70 dark:text-amber-400/70">Pending</span>
+        </div>
+        <div
+          class="px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 flex flex-col items-center justify-center min-w-[100px] shadow-sm">
+          <span class="text-2xl font-bold text-emerald-600 dark:text-emerald-400" id="approvedStat">0</span>
+          <span
+            class="text-[10px] uppercase tracking-wider font-semibold text-emerald-600/70 dark:text-emerald-400/70">Approved</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pending Uploads Section -->
+    <section class="fade-up d2 space-y-5">
+      <div class="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div
+          class="h-8 w-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-slate-800 dark:text-slate-100">Review Pending</h2>
+      </div>
+
+      <div id="pendingContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <p class="col-span-full text-sm text-slate-500 dark:text-slate-400 py-4">Checking pending requests...</p>
+      </div>
+    </section>
+
+    <!-- Approved Resources Section -->
+    <section class="fade-up d3 space-y-5 pb-10">
+      <div
+        class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div class="flex items-center gap-3">
+          <div
+            class="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <h2 class="text-xl font-semibold text-slate-800 dark:text-slate-100">Live Resources</h2>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div class="relative w-full max-w-xs">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none"
+              stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input id="searchApproved" type="text" placeholder="Search live items..."
+              class="w-full pl-9 pr-4 py-2 text-sm rounded-xl border dark:border-slate-700 border-slate-300 dark:bg-slate-900/80 bg-slate-50 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 dark:text-white input-el"
+              oninput="handleSearchApproved()" />
+          </div>
+          <button type="button" onclick="toggleUploadPanel(true)"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all glow-pill whitespace-nowrap">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            Upload Directly
+          </button>
+        </div>
+      </div>
+
+      <div id="approvedContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- Mock Data Container -->
+        <p class="col-span-full text-sm text-slate-500 dark:text-slate-400 py-4">Loading active directory...</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t dark:border-slate-800 border-slate-200 py-6 card-transition mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <div class="h-6 w-6 rounded-md bg-indigo-500 flex items-center justify-center"><span
+            class="text-[10px] font-bold text-white">SL</span></div>
+        <span class="text-xs dark:text-slate-500 text-slate-400">Smart Learning Hub Admin</span>
+      </div>
+      <p class="text-[11px] dark:text-slate-500 text-slate-400">© <span id="year"></span> All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- Admin Upload Side Panel (Drawer) -->
+  <div id="uploadBackdrop"
+    class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 hidden transition-opacity duration-300 opacity-0"
+    onclick="toggleUploadPanel(false)"></div>
+
+  <div id="uploadPanel"
+    class="fixed inset-y-0 right-0 w-full max-w-sm dark:bg-slate-950 bg-white border-l dark:border-slate-800 border-slate-200 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 flex flex-col">
+
+    <div class="flex items-center justify-between px-6 py-5 border-b dark:border-slate-800 border-slate-200">
+      <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Admin Direct Upload</h3>
+      <button type="button" onclick="toggleUploadPanel(false)"
+        class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar">
+      <p class="text-sm dark:text-slate-400 text-slate-600 mb-6 leading-relaxed">
+        Resources uploaded by admins bypass the pending queue and are <strong
+          class="text-indigo-500 dark:text-indigo-400">immediately visible</strong> to all students.
+      </p>
+
+      <form id="uploadForm" class="space-y-4" onsubmit="handleUpload(event)">
+        <!-- Semester -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-medium dark:text-slate-300 text-slate-700">Semester</label>
+          <select id="uploadSemester"
+            class="input-el w-full rounded-xl border dark:border-slate-700 border-slate-300 dark:bg-slate-900/80 bg-slate-50 px-3 py-2.5 text-sm dark:text-slate-100 text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            required>
+            <option value="">Select semester</option>
+            <option value="1">Sem 1</option>
+            <option value="2">Sem 2</option>
+            <option value="3">Sem 3</option>
+            <option value="4">Sem 4</option>
+            <option value="5">Sem 5</option>
+            <option value="6">Sem 6</option>
+            <option value="7">Sem 7</option>
+            <option value="8">Sem 8</option>
+          </select>
+        </div>
+
+        <!-- Subject -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-medium dark:text-slate-300 text-slate-700">Subject Name</label>
+          <input id="uploadSubject" type="text" placeholder="e.g. Data Structures"
+            class="input-el w-full rounded-xl border dark:border-slate-700 border-slate-300 dark:bg-slate-900/80 bg-slate-50 px-3 py-2.5 text-sm dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            required />
+        </div>
+
+        <!-- Title -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-medium dark:text-slate-300 text-slate-700">Resource Title</label>
+          <input id="uploadTitle" type="text" placeholder="e.g. Unit 1 Complete Notes"
+            class="input-el w-full rounded-xl border dark:border-slate-700 border-slate-300 dark:bg-slate-900/80 bg-slate-50 px-3 py-2.5 text-sm dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            required />
+        </div>
+
+        <!-- Type -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-medium dark:text-slate-300 text-slate-700">Resource Type</label>
+          <select id="uploadType"
+            class="input-el w-full rounded-xl border dark:border-slate-700 border-slate-300 dark:bg-slate-900/80 bg-slate-50 px-3 py-2.5 text-sm dark:text-slate-100 text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            required>
+            <option value="notes">Notes</option>
+            <option value="pyq">Previous Year Question (PYQ)</option>
+            <option value="reference">Reference Link / Video</option>
+          </select>
+        </div>
+
+        <!-- File URL -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-medium dark:text-slate-300 text-slate-700">File URL</label>
+          <input id="uploadFileURL" type="url" placeholder="https://drive.google.com/..."
+            class="input-el w-full rounded-xl border dark:border-slate-700 border-slate-300 dark:bg-slate-900/80 bg-slate-50 px-3 py-2.5 text-sm dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            required />
+        </div>
+
+        <div id="uploadMessage" class="hidden text-xs rounded-lg px-3 py-2 mt-4 flex items-center gap-2"></div>
+
+        <button id="uploadButton" type="submit"
+          class="w-full mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] text-sm font-semibold text-white py-3 shadow-lg shadow-indigo-500/30 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed">
+          <span id="uploadButtonText">Publish Immediately</span>
+          <span id="uploadSpinner"
+            class="hidden h-4 w-4 border-2 border-white/50 border-t-transparent rounded-full animate-spin"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // ── Theme Setup ──
+    const html = document.documentElement;
+    const toggleEl = document.getElementById('themeToggle');
+    const toggleIcon = document.getElementById('toggleIcon');
+    const saved = localStorage.getItem('slhTheme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setTheme(saved ? saved === 'dark' : prefersDark);
+    function setTheme(dark) {
+      if (dark) {
+        html.classList.add('dark');
+        toggleIcon.textContent = '🌙';
+        toggleEl.setAttribute('aria-checked', 'true');
+      } else {
+        html.classList.remove('dark');
+        toggleIcon.textContent = '☀️';
+        toggleEl.setAttribute('aria-checked', 'false');
+      }
+      localStorage.setItem('slhTheme', dark ? 'dark' : 'light');
+    }
+    toggleEl.addEventListener('click', () => setTheme(!html.classList.contains('dark')));
+
+    // ── Fake Firebase logic / UI Mocking ──
+    const pendingContainer = document.getElementById('pendingContainer');
+    const approvedContainer = document.getElementById('approvedContainer');
+    const pendingStat = document.getElementById('pendingStat');
+    const approvedStat = document.getElementById('approvedStat');
+
+    let mockPending = [
+      { id: 'p1', title: 'Data Structures Midterm PYQ', semester: '3', subject: 'Data Structures', type: 'pyq', uploader: 'John Doe', url: '#' },
+      { id: 'p2', title: 'OS Unit 1 & 2 Complete Notes', semester: '4', subject: 'Operating Systems', type: 'notes', uploader: 'Sarah T.', url: '#' },
+    ];
+
+    let mockApproved = [
+      { id: 'a1', title: 'Maths II Solution Manual', semester: '2', subject: 'Mathematics II', type: 'reference', uploader: 'Admin', url: '#' },
+      { id: 'a2', title: 'DBMS Full Course Video Ref', semester: '4', subject: 'Database Management', type: 'reference', uploader: 'Mike R.', url: '#' },
+      { id: 'a3', title: 'Programming in C Hand Notes', semester: '2', subject: 'Programming in C', type: 'notes', uploader: 'Emma W.', url: '#' },
+      { id: 'a4', title: 'Software Eng. Case Studies', semester: '3', subject: 'Software Engineering', type: 'notes', uploader: 'Admin', url: '#' },
+      { id: 'a5', title: 'Dec 2024 End Term Papers', semester: '5', subject: 'Computer Networks', type: 'pyq', uploader: 'Alex P.', url: '#' }
+    ];
+
+    let currentSearch = "";
+
+    function handleLogout() {
+      // auth.signOut().then(() => window.location.href = 'login.html');
+      window.location.href = 'login.html';
+    }
+
+    // ── Rendering Pending ──
+    function renderPending() {
+      pendingContainer.innerHTML = '';
+      pendingStat.textContent = mockPending.length;
+
+      if (mockPending.length === 0) {
+        pendingContainer.innerHTML = `
+          <div class="col-span-full py-10 text-center rounded-2xl border border-dashed dark:border-slate-700 border-slate-300 dark:bg-slate-900/30 bg-slate-50">
+            <div class="text-3xl mb-3 opacity-50">✅</div>
+            <h3 class="text-sm font-medium text-slate-700 dark:text-slate-300">All caught up!</h3>
+            <p class="text-xs text-slate-500 mt-1">There are no pending resources to review.</p>
+          </div>
+        `;
+        return;
+      }
+
+      mockPending.forEach(r => {
+        const card = document.createElement('div');
+        card.className = "interactive-card rounded-2xl dark:bg-slate-900/80 bg-white border border-amber-200 dark:border-amber-500/20 shadow-sm p-4 flex flex-col justify-between";
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 text-[10px] uppercase font-bold tracking-widest">${r.type}</span>
+              <a href="${r.url}" target="_blank" class="text-xs font-semibold text-indigo-500 hover:text-indigo-600 transition-colors flex items-center gap-1">View File <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>
+            </div>
+            <h3 class="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2 mt-2 leading-snug">${r.title}</h3>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 mono">Sem ${r.semester} • ${r.subject}</p>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">By: <span class="font-medium text-slate-600 dark:text-slate-300">${r.uploader}</span></p>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button onclick="approveResource('${r.id}')" class="py-2 rounded-xl bg-emerald-50 text-emerald-600 font-semibold text-xs hover:bg-emerald-500 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-emerald-50 transition-colors">Approve</button>
+            <button onclick="rejectResource('${r.id}')" class="py-2 rounded-xl bg-red-50 text-red-600 font-semibold text-xs hover:bg-red-500 hover:text-white dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-red-50 transition-colors">Reject</button>
+          </div>
+        `;
+        pendingContainer.appendChild(card);
+      });
+    }
+
+    // ── Rendering Approved ──
+    const typeIcons = { 'notes': '📝', 'pyq': '📄', 'reference': '🔗' };
+
+    function handleSearchApproved() {
+      currentSearch = document.getElementById('searchApproved').value || '';
+      renderApproved();
+    }
+
+    function renderApproved() {
+      approvedContainer.innerHTML = '';
+      approvedStat.textContent = mockApproved.length;
+
+      let list = mockApproved.filter(r => r.title.toLowerCase().includes(currentSearch.toLowerCase()) || r.subject.toLowerCase().includes(currentSearch.toLowerCase()));
+
+      if (list.length === 0) {
+        approvedContainer.innerHTML = `
+          <div class="col-span-full py-12 text-center rounded-2xl border border-dashed dark:border-slate-700 border-slate-300 dark:bg-slate-900/30 bg-slate-50">
+            <div class="text-3xl mb-3 opacity-50">📂</div>
+            <h3 class="text-sm font-medium text-slate-700 dark:text-slate-300">No resources found</h3>
+            <p class="text-xs text-slate-500 mt-1">Try adjusting your search criteria.</p>
+          </div>
+        `;
+        return;
+      }
+
+      list.forEach((r, idx) => {
+        const card = document.createElement('div');
+        card.className = "interactive-card rounded-2xl dark:bg-slate-900/80 bg-white border dark:border-slate-800 border-slate-200 shadow-sm p-4 flex flex-col justify-between fade-up";
+        card.style.animationDelay = `${0.05 * (idx % 8)}s`;
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xl">${typeIcons[r.type] || '📌'}</span>
+              <span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] uppercase font-bold tracking-widest">${r.type}</span>
+            </div>
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100 line-clamp-2 mt-2 leading-snug">${r.title}</h3>
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 mono">Sem ${r.semester} • ${r.subject}</p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+            <button onclick="revertToPending('${r.id}')" class="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-amber-500 transition-colors">Mark Pending</button>
+            <button onclick="deleteApproved('${r.id}')" class="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+          </div>
+        `;
+        approvedContainer.appendChild(card);
+      });
+    }
+
+    // ── Actions ──
+    function approveResource(id) {
+      const idx = mockPending.findIndex(p => p.id === id);
+      if (idx > -1) {
+        const item = mockPending.splice(idx, 1)[0];
+        mockApproved.unshift(item); // add to top
+        renderPending();
+        renderApproved();
+      }
+    }
+
+    function rejectResource(id) {
+      if (confirm('Are you sure you want to reject this upload permanently?')) {
+        mockPending = mockPending.filter(p => p.id !== id);
+        renderPending();
+      }
+    }
+
+    function revertToPending(id) {
+      const idx = mockApproved.findIndex(a => a.id === id);
+      if (idx > -1) {
+        const item = mockApproved.splice(idx, 1)[0];
+        mockPending.unshift(item);
+        renderPending();
+        renderApproved();
+      }
+    }
+
+    function deleteApproved(id) {
+      if (confirm('Are you sure you want to delete this live resource?')) {
+        mockApproved = mockApproved.filter(a => a.id !== id);
+        renderApproved();
+      }
+    }
+
+    // ── Admin Direct Upload Panel ──
+    const uploadPanel = document.getElementById('uploadPanel');
+    const uploadBackdrop = document.getElementById('uploadBackdrop');
+
+    function toggleUploadPanel(open) {
+      if (open) {
+        uploadBackdrop.classList.remove('hidden');
+        setTimeout(() => {
+          uploadBackdrop.classList.remove('opacity-0');
+          uploadPanel.classList.remove('translate-x-full');
+        }, 10);
+      } else {
+        uploadBackdrop.classList.add('opacity-0');
+        uploadPanel.classList.add('translate-x-full');
+        document.getElementById('uploadMessage').classList.add('hidden');
+        setTimeout(() => uploadBackdrop.classList.add('hidden'), 300);
+      }
+    }
+
+    async function handleUpload(e) {
+      e.preventDefault();
+
+      const sem = document.getElementById('uploadSemester').value;
+      const sub = document.getElementById('uploadSubject').value;
+      const title = document.getElementById('uploadTitle').value;
+      const type = document.getElementById('uploadType').value;
+      const url = document.getElementById('uploadFileURL').value;
+
+      const msg = document.getElementById('uploadMessage');
+      const btn = document.getElementById('uploadButton');
+      const btnText = document.getElementById('uploadButtonText');
+      const spinner = document.getElementById('uploadSpinner');
+
+      btn.disabled = true;
+      btnText.textContent = 'Publishing...';
+      spinner.classList.remove('hidden');
+      msg.classList.add('hidden');
+
+      try {
+        // Mocking firebase add & upload time
+        await new Promise(r => setTimeout(r, 800));
+
+        // Push directly to approved resources since it's an admin upload
+        const newResource = {
+          id: 'admin-' + Date.now(),
+          title: title,
+          semester: sem,
+          subject: sub,
+          type: type,
+          uploader: 'Admin',
+          url: url
+        };
+
+        mockApproved.unshift(newResource);
+        renderApproved(); // re-render layout
+
+        msg.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> <span>Resource is now live!</span>';
+        msg.className = 'flex items-center gap-2 text-xs rounded-lg px-3 py-2 mt-4 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20';
+        msg.classList.remove('hidden');
+
+        document.getElementById('uploadForm').reset();
+
+        setTimeout(() => toggleUploadPanel(false), 2000);
+      } catch (err) {
+        msg.textContent = 'Error publishing. Please try again.';
+        msg.className = 'text-xs rounded-lg px-3 py-2 mt-4 bg-red-500/10 text-red-500 border border-red-500/20';
+        msg.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Publish Immediately';
+        spinner.classList.add('hidden');
+      }
+    }
+
+    // Initialize mock UI
+    setTimeout(() => {
+      renderPending();
+      renderApproved();
+    }, 400);
+
+  </script>
+</body>
+
+</html>
